@@ -1,0 +1,15 @@
+# PlatformIO / Arduino
+.pio/
+build/
+# Python
+__pycache__/
+*.pyc
+.venv/
+# secrets
+.env
+*secret*
+klucz_odpowiedzi*
+answer_key*
+# system
+.DS_Store
+Thumbs.db
