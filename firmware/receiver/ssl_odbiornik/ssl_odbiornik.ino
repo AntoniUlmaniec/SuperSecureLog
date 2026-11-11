@@ -12,6 +12,23 @@
 #include "ssl_klucz.h"
 #include "nrf905.h"
 
+// ======================================================= OKABLOWANIE nRF905 – wybierz jedno
+//  0 = jak w czujniku:            TX_EN -> 17, TRX_CE -> 16, PWR_UP -> 4,  DR -> 27
+//  1 = jak w przykladach nopnop2002/esp-idf-nrf905:
+//                                 TX_EN -> 15, TRX_CE -> 17, PWR_UP -> 16, DR niepodlaczony
+//  W obu: CSN 5, SCK 18, MISO 19, MOSI 23, VCC 3V3, GND.
+#ifndef UKLAD_ODBIORNIKA
+#define UKLAD_ODBIORNIKA 0
+#endif
+
+Nrf905Pins radioPins() {
+  Nrf905Pins p;                                   // domyślnie układ 0
+#if UKLAD_ODBIORNIKA == 1
+  p.txen = 15; p.ce = 17; p.pwr = 16; p.dr = -1;
+#endif
+  return p;
+}
+
 Nrf905 radio;
 Preferences prefs;
 
@@ -93,12 +110,14 @@ void setup() {
   delay(300);
   prefs.begin("sslgw", false);
   const uint8_t myAddr[4] = {'S', 'S', 'L', ssl::GATEWAY_ID};
-  while (!radio.begin(myAddr)) {
+  while (!radio.begin(myAddr, radioPins())) {
     Serial.println("{\"ev\":\"blad\",\"opis\":\"nRF905 nie odpowiada - sprawdz zasilanie 3V3, CSN/SCK/MISO/MOSI, PWR_UP\"}");
     delay(2000);
   }
   radio.startRx();
-  Serial.println("{\"ev\":\"start\",\"opis\":\"odbiornik gotowy, 433.2 MHz\"}");
+  Nrf905Pins p = radioPins();
+  Serial.printf("{\"ev\":\"start\",\"opis\":\"odbiornik gotowy, 433.2 MHz, uklad %d: TX_EN %d, TRX_CE %d, PWR_UP %d, DR %d\"}\n",
+                UKLAD_ODBIORNIKA, p.txen, p.ce, p.pwr, p.dr);
 }
 
 void loop() {
@@ -118,7 +137,7 @@ void loop() {
                   ok ? "ok" : "BLAD", (unsigned long)frames, (unsigned long)badMac, (unsigned long)amEdges);
     if (!ok) {
       const uint8_t myAddr[4] = {'S', 'S', 'L', ssl::GATEWAY_ID};
-      radio.begin(myAddr);
+      radio.begin(myAddr, radioPins());
       radio.startRx();
     }
   }

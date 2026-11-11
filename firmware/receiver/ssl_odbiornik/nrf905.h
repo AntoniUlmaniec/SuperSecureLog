@@ -14,7 +14,7 @@
 #include "driver/rtc_io.h"
 
 struct Nrf905Pins {
-  int8_t csn = 5, ce = 16, txen = 17, pwr = 4, dr = 27;
+  int8_t csn = 5, ce = 16, txen = 17, pwr = 4, dr = 27;   // dr = -1: brak przewodu DR, stan z rejestru przez SPI
   int8_t sck = 18, miso = 19, mosi = 23;
 };
 
@@ -40,7 +40,7 @@ class Nrf905 {
     pinMode(p_.ce, OUTPUT);   digitalWrite(p_.ce, LOW);
     pinMode(p_.txen, OUTPUT); digitalWrite(p_.txen, LOW);
     pinMode(p_.pwr, OUTPUT);  digitalWrite(p_.pwr, LOW);
-    pinMode(p_.dr, INPUT);
+    if (p_.dr >= 0) pinMode(p_.dr, INPUT);
     SPI.begin(p_.sck, p_.miso, p_.mosi, -1);
     spi_ = SPISettings(cfg.spiHz, MSBFIRST, SPI_MODE0);
     spiOn_ = true;
@@ -69,10 +69,13 @@ class Nrf905 {
 
   bool ready() const { return ready_; }
 
+  // Odczyt 10 bajtów rejestru konfiguracji (diagnostyka).
+  void readConfig(uint8_t out[10]) { cmd(R_CONFIG, nullptr, out, 10); }
+
   // Rejestr stanu nRF905 (przychodzi przez SPI przy każdej komendzie): bit 5 = DR, bit 7 = AM.
   // Pozwala wykryć odebrany pakiet nawet przy niedziałającym przewodzie DR.
   uint8_t status() { return cmd(R_CONFIG, nullptr, nullptr, 0); }
-  bool drPin() { return digitalRead(p_.dr) == HIGH; }
+  bool drPin() { return p_.dr >= 0 && digitalRead(p_.dr) == HIGH; }
   uint32_t drPinMisses = 0;   // ile razy DR był w rejestrze, a pin DR milczał (zły przewód DR)
 
   // Wysyła 32 B na adres txAddr. Wraca do standby. false = brak DR w czasie (moduł nie nadał).
@@ -90,7 +93,7 @@ class Nrf905 {
     bool ok = false;
     while (millis() - t0 < timeoutMs) {
       if (drPin()) { ok = true; break; }
-      if (status() & 0x20) { if (!drPin()) drPinMisses++; ok = true; break; }
+      if (status() & 0x20) { if (p_.dr >= 0 && !drPin()) drPinMisses++; ok = true; break; }
     }
     digitalWrite(p_.ce, LOW);                     // koniec: standby
     digitalWrite(p_.txen, LOW);
@@ -107,7 +110,7 @@ class Nrf905 {
   // DR = odebrano pakiet z poprawnym adresem i CRC.
   bool available() {
     if (drPin()) return true;
-    if (status() & 0x20) { if (!drPin()) drPinMisses++; return true; }
+    if (status() & 0x20) { if (p_.dr >= 0 && !drPin()) drPinMisses++; return true; }
     return false;
   }
 

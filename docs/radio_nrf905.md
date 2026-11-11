@@ -14,23 +14,49 @@ the receiver acknowledges every packet (ACK) and prints one JSON line per event 
 ## Wiring (node and receiver identical)
 Wire by the **pin labels printed on the ESP32 board**, not by breadboard column letters.
 
-| nRF905 pin | ESP32 pin |
-|---|---|
-| 1 VCC | 3V3 (never 5V) |
-| 13 GND | GND |
-| 2 TX_EN | 17 |
-| 3 TRX_CE | 16 |
-| 4 PWR_UP | 4 |
-| 8 DR | 27 |
-| 9 MISO | 19 |
-| 10 MOSI | 23 |
-| 11 SCK | 18 |
-| 12 CSN | 5 |
-| 5 uCLK, 6 CD, 7 AM, 14 GND | not connected |
+| nRF905 pin | ESP32 GPIO | label on DevKit V1-style boards |
+|---|---|---|
+| 1 VCC | 3V3 (never 5V) | 3V3 |
+| 13 GND | GND | GND |
+| 2 TX_EN | 17 | TX2 |
+| 3 TRX_CE | 16 | RX2 |
+| 4 PWR_UP | 4 | D4 |
+| 8 DR | 27 | D27 (optional, see below) |
+| 9 MISO | 19 | D19 |
+| 10 MOSI | 23 | D23 |
+| 11 SCK | 18 | D18 |
+| 12 CSN | 5 | D5 |
+| 5 uCLK, 6 CD, 7 AM, 14 GND | not connected | |
+
+DR is optional: the driver also reads the data-ready bit from the status register over SPI.
+The receiver sketch has `UKLAD_ODBIORNIKA` (0 = wiring above, 1 = nopnop2002 example defaults:
+TX_EN 15, TRX_CE 17, PWR_UP 16, no DR).
 
 No extra resistors or capacitors are needed when powered from USB.
 Node sensor pins for reference: SDA 21, SCL 22, INT1 33 (accelerometer), mic VCC 25, AOUT 34, DOUT 32.
 Keep 0, 2, 12, 15 (boot pins) and the flash pins (CLK, SD0–SD3, CMD) free.
+
+## Compatibility with the nopnop2002 / Zak Kemble nRF905 driver
+Filip's ESP-IDF tests used https://github.com/nopnop2002/esp-idf-nrf905. Its radio settings match ours
+(16 MHz crystal, CRC16, +10 dBm, 32-byte payload, 4-byte address) **except two defaults**:
+
+| setting | nopnop2002 default | SSL (use this) |
+|---|---|---|
+| channel | 10 = 423.4 MHz – **outside** the licence-free 433.05–434.79 MHz band | **108 = 433.2 MHz** |
+| address | `0xE7E7E7E7` | receiver `0x004C5353`, node N `0x0N4C5353` |
+
+Devices with different channels or addresses never hear each other. To talk to SSL nodes with that driver:
+```c
+// components/nRF905/nRF905_config.h
+#define NRF905_CHANNEL   108          // 433.2 MHz
+#define NRF905_ADDRESS   0x004C5353   // receiver address
+// main.c
+#define RXADDR 0x004C5353             // bytes 'S','S','L',0x00, sent least significant byte first
+#define TXADDR 0x014C5353             // ACK to node 1
+```
+The payload must still follow the packet format below (HMAC, ACK) – the raw nopnop examples do not.
+`firmware/node/test_radio` sends raw packets and can switch live between both channel/address sets
+(keys `k` and `a`) to check two boards against each other.
 
 ## Packet (32 bytes, little-endian)
 Defined in `ssl_protocol.h` (same file in both sketches).

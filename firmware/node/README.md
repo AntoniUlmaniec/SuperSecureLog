@@ -8,6 +8,7 @@ Owners: Igor, Filip, Łukasz.
 |---|---|
 | `ssl_czuwanie/` | main node firmware: deep sleep, wake on motion / timer, 5 s motion + sound analysis, `decide()`, radio alerts with ACK |
 | `ssl_nadajnik_ciagly/` | link test: sends a test packet every 0.5 s and reports transmission and ACK |
+| `test_radio/` | raw radio test, same sketch on both boards: `t` transmit, `r` receive, `k`/`a` switch channel/address (SSL vs nopnop2002 defaults) |
 | `test_lis3dh/` | accelerometer diagnostics: register writes, direct reads, FIFO, motion interrupt on INT1 |
 | `szukaj_akcelerometru/` | finds which pins the accelerometer is really wired to and whether it is powered |
 
